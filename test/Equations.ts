@@ -1,15 +1,17 @@
-import { time, loadFixture } from "@nomicfoundation/hardhat-network-helpers";
-import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
+import { loadFixture } from "@nomicfoundation/hardhat-network-helpers";
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { BigNumber } from "ethers";
+import { parseEther } from "ethers/lib/utils";
 
 describe("Equations", function () {
+
+    // How much the staker i stacked on the user j
     const CR = [
         [
-            500,
-            300,
-            1000,
+            500, // user0 - staker 0
+            300, // user1 - staker 0
+            1000, // user2 - staker 0
             1050,
             200,
             400,
@@ -18,21 +20,24 @@ describe("Equations", function () {
             1000
         ],
         [
-            100,
+            100,  // user0 - staker 1
             800,
             500,
             2000
         ],
         [
+            200,  // user0 - staker 2
             200,
-            200
         ]
     ];
 
+    // Blue -> we might ned to know who made the endorcments to this user
+
+    // How much staked on this user j in total
     const CD = [
         [
-            1000,
-            2000,
+            1000, // user 0
+            2000, // user 0
             3000,
             4000,
             5000,
@@ -71,8 +76,9 @@ describe("Equations", function () {
         }
     ];
 
-    const WEIGHTAGE_0 = 3000;
-    const WEIGHTAGE_1 = 7000;
+    const WEIGHTAGE_0 = 3000; // w_0 // we multiple everything by 1000
+    const WEIGHTAGE_1 = 7000; // w_1
+
     // value is out of 100 for penalty so, ie. 40 is 0.4 or 40%
     const PENALTY = 40;
     const MAX_ENDORCEMENTS = 10;
@@ -90,6 +96,7 @@ describe("Equations", function () {
         return { equations, owner, otherAccount};
     }
 
+
     describe("Deployment", function() {
         it("Should set the right deployed status", async function () {
         const { equations } = await loadFixture(setup);
@@ -98,6 +105,8 @@ describe("Equations", function () {
         });
     });
 
+
+
     describe("Number of Endorcements", function() {
         it("Value return should be accurate", async function () {
             const { equations } = await loadFixture(setup);
@@ -105,8 +114,16 @@ describe("Equations", function () {
 
             const endorcementsMade = users[0].endorcementsMade;
 
-            const numOfEndorcements = await equations.numberOfEndorcements(PENALTY, MAX_ENDORCEMENTS, endorcementsMade);
-            expect(numOfEndorcements).to.equals(0);
+            const numOfEndorcements = await equations.numberOfEndorcements(MAX_ENDORCEMENTS, endorcementsMade);
+            expect(numOfEndorcements).to.equals(90);
+
+
+            const endorcementsMade_2 = users[1].endorcementsMade;
+
+            const numOfEndorcements_2 = await equations.numberOfEndorcements(MAX_ENDORCEMENTS, endorcementsMade_2);
+            expect(numOfEndorcements_2).to.equals(40);
+
+            
         });
     });
 
@@ -114,8 +131,8 @@ describe("Equations", function () {
         it("Value return should be accurate", async function () {
             const { equations } = await loadFixture(setup);
 
-            const qualityOfStakes = await equations.qualityOfStakes(users[0].cr, users[0].cd);
-            expect(qualityOfStakes).to.equals(1832);
+            const qualityOfStakes = await equations.qualityOfStakes(users[2].cr, users[2].cd);
+            expect(qualityOfStakes).to.equals(15);
         });
     });
 
@@ -127,16 +144,17 @@ describe("Equations", function () {
                 cr: users[0].cr, 
                 cd: users[0].cd,
             }
+            
             const numberOfEndorcements = {
-                v: PENALTY,
                 mE: MAX_ENDORCEMENTS,
                 eN: users[0].endorcementsMade
             }
 
             const qualityOfStakers = await equations.qualityOfStaker(WEIGHTAGE_0, WEIGHTAGE_1, numberOfEndorcements, qualityOfStakes);
+
+            expect(qualityOfStakers).to.equal(39);
             
-            // simulate actual transaction values for the functions involved
-            let numOfEndorcementsVal: BigNumber = await equations.numberOfEndorcements(PENALTY, MAX_ENDORCEMENTS, users[0].endorcementsMade);
+            let numOfEndorcementsVal: BigNumber = await equations.numberOfEndorcements(MAX_ENDORCEMENTS, users[0].endorcementsMade);
             let qualityOfStakesVal: BigNumber = await equations.qualityOfStakes(users[0].cr, users[0].cd);
             let qualityOfStakersVal = ((numOfEndorcementsVal.mul(WEIGHTAGE_0)).add(qualityOfStakesVal.mul(WEIGHTAGE_1))).div(10000);
             
@@ -149,7 +167,6 @@ describe("Equations", function () {
             const { equations } = await loadFixture(setup);
 
             const user1NE = {
-                v: PENALTY,
                 mE: MAX_ENDORCEMENTS,
                 eN: users[0].endorcementsMade
             };
@@ -160,7 +177,6 @@ describe("Equations", function () {
             }
 
             const user2NE = {
-                v: PENALTY,
                 mE: MAX_ENDORCEMENTS,
                 eN: users[1].endorcementsMade
             };
@@ -171,7 +187,6 @@ describe("Equations", function () {
             }
 
             const user3NE = {
-                v: PENALTY,
                 mE: MAX_ENDORCEMENTS,
                 eN: users[2].endorcementsMade
             };
@@ -186,23 +201,35 @@ describe("Equations", function () {
                 {
                     NE: user1NE,
                     QS: user1QS,
-                    stakeAmount: users[0].cr[0]
+                    stakeAmount: users[0].cr[0],
+                    qualityStaker:-1
                 },
                 {
                     NE: user2NE,
                     QS: user2QS,
-                    stakeAmount: users[1].cr[0]
+                    stakeAmount: users[1].cr[0],
+                    qualityStaker:-1
                 },
                 {
                     NE: user3NE,
                     QS: user3QS,
-                    stakeAmount: users[2].cr[0]
+                    stakeAmount: users[2].cr[0],
+                    qualityStaker:-1
                 },
             ]
-            
 
-            const maxRewards = await equations.getMaxRewards(MULTIPLIER, maxRewardsStruct, WEIGHTAGE_0, WEIGHTAGE_1);
-            console.log("max rewards", maxRewards.toString());
+            let qualityStaker_now;
+
+            for (let i=0;i<maxRewardsStruct.length;i++){
+                qualityStaker_now = await equations.qualityOfStaker(WEIGHTAGE_0, WEIGHTAGE_1, maxRewardsStruct[i].NE, maxRewardsStruct[i].QS);
+                maxRewardsStruct[i].qualityStaker = Number(qualityStaker_now);
+            }
+
+            const maxRewards = await equations.getMaxRewards(MULTIPLIER, maxRewardsStruct, parseEther('1'));
+            expect(maxRewards).to.equals(284);
+
+            // Use only the stake and the quality of the getMaxRewards
+            // multiple them, and get back result 
         });
     });
 
@@ -211,7 +238,6 @@ describe("Equations", function () {
             const { equations } = await loadFixture(setup);
 
             const user1NE = {
-                v: PENALTY,
                 mE: MAX_ENDORCEMENTS,
                 eN: users[0].endorcementsMade
             };
@@ -222,7 +248,6 @@ describe("Equations", function () {
             }
 
             const user2NE = {
-                v: PENALTY,
                 mE: MAX_ENDORCEMENTS,
                 eN: users[1].endorcementsMade
             };
@@ -233,7 +258,6 @@ describe("Equations", function () {
             }
 
             const user3NE = {
-                v: PENALTY,
                 mE: MAX_ENDORCEMENTS,
                 eN: users[2].endorcementsMade
             };
@@ -243,33 +267,46 @@ describe("Equations", function () {
                 cd: users[2].cd
             }
 
-
             const maxRewardsStruct = [
                 {
                     NE: user1NE,
                     QS: user1QS,
-                    stakeAmount: users[0].cr[0]
+                    stakeAmount: users[0].cr[0],
+                    qualityStaker: -1,
                 },
                 {
                     NE: user2NE,
                     QS: user2QS,
-                    stakeAmount: users[1].cr[0]
+                    stakeAmount: users[1].cr[0],
+                    qualityStaker: -1,
                 },
                 {
                     NE: user3NE,
                     QS: user3QS,
-                    stakeAmount: users[2].cr[0]
+                    stakeAmount: users[2].cr[0],
+                    qualityStaker: -1,
                 },
             ]
+
+            let stakerTest = 2;
             
-            const stakerValues = {
-                NE: user1NE,
-                QS: user1QS,
-                stakeAmount: users[0].cr[0]
+            const stakerValues = maxRewardsStruct[stakerTest];
+
+
+            let qualityStaker_now;
+
+            for (let i=0;i<maxRewardsStruct.length;i++){
+                qualityStaker_now = await equations.qualityOfStaker(WEIGHTAGE_0, WEIGHTAGE_1, maxRewardsStruct[i].NE, maxRewardsStruct[i].QS);
+                maxRewardsStruct[i].qualityStaker = Number(qualityStaker_now);
             }
 
-            const rewardsPerUser = await equations.rewardPerUser(MULTIPLIER, maxRewardsStruct, WEIGHTAGE_0, WEIGHTAGE_1, stakerValues);
-            console.log("rewardsPerUser", rewardsPerUser.toString());
+            const maxRewards = await equations.getMaxRewards(MULTIPLIER, maxRewardsStruct, parseEther('1'));
+            expect(maxRewards).to.equals(284);
+
+            const rewardsForUser = await equations.rewardPerUser(maxRewards, maxRewardsStruct, stakerValues);
+            expect(rewardsForUser).to.equals(34);
         });
     });
 });
+
+// break down the functions to 1 describe
