@@ -4,12 +4,6 @@ import "hardhat/console.sol";
 
 contract Equations {
 
-    bool public deployedStatus;
-
-    constructor(bool _deployed){
-        deployedStatus = _deployed;
-    }
-
     struct StakerValue {
         NoOfEndorcements NE;
         QualityOfStakes QS;

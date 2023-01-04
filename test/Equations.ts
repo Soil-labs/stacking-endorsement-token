@@ -91,21 +91,10 @@ describe("Equations", function () {
         const [owner, otherAccount] = await ethers.getSigners();
 
         const Equations = await ethers.getContractFactory("Equations");
-        const equations = await Equations.deploy(true);
+        const equations = await Equations.deploy();
 
         return { equations, owner, otherAccount};
     }
-
-
-    describe("Deployment", function() {
-        it("Should set the right deployed status", async function () {
-        const { equations } = await loadFixture(setup);
-
-        expect(await equations.deployedStatus()).to.equal(true);
-        });
-    });
-
-
 
     describe("Number of Endorcements", function() {
         it("Value return should be accurate", async function () {
@@ -195,7 +184,6 @@ describe("Equations", function () {
                 cr: users[2].cr,
                 cd: users[2].cd
             }
-
 
             const maxRewardsStruct = [
                 {
