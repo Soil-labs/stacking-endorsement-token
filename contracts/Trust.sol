@@ -18,28 +18,11 @@ contract Trust is ERC20, Ownable {
         tokenDecimals = _decimals;
     }
 
-    function mint(address _to, uint256 _amount) external {
+    function mint(address _to, uint256 _amount) external onlyOwner {
         _mint(_to, _amount);
     }
 
-    function setFaucet(address _faucet) external onlyOwner {
-        faucet = _faucet;
-    }
-
-    function _checkFaucet() internal view {
-        require(faucet == msg.sender, "!faucet");
-    }
-
-    modifier onlyFaucet() {
-        _checkFaucet();
-        _;
-    }
-
-    function mintFaucet(address _to, uint256 _amount) external onlyFaucet {
-        _mint(_to, _amount);
-    }
-
-    function burn(address _from, uint256 _amount) external {
+    function burn(address _from, uint256 _amount) external onlyOwner {
         _burn(_from, _amount);
     }
 

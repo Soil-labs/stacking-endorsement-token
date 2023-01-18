@@ -49,14 +49,13 @@ contract Equations {
     /// @param m how much extra reward from the stake amount you want to give - approximately the upper limit of the maxRewards as long as the quality of the staker is high
     /// @param MR struct used to get the values relevant to find the sum of stakers and max rewards
     /// @notice the weightage should be entered in basis points and equals to 10_000
-    function getMaxRewards(uint256 m, MaxRewards[] memory MR, uint256 _availRewards) public view returns (uint256 sumOfStakers_) {
+    function getMaxRewards(uint256 m, MaxRewards[] memory MR, uint256 _availRewards) public pure returns (uint256 sumOfStakers_) {
         require(MR.length != 0, "!length");
 
         uint256 L = MR.length;
         sumOfStakers_ = 0;
 
         for(uint256 i = 0; i < L; i++){
-            console.log("stakeAmount", MR[i].stakeAmount);
             sumOfStakers_ += (MR[i].stakeAmount * MR[i].qualityStaker) / 100;
         }
 
@@ -141,6 +140,6 @@ contract Equations {
     function numberOfEndorcements(uint256 mE, uint256 eN) public pure returns (uint256 number_) {
         require(eN < mE, "!eN");
 
-        number_ = (eN*100*100)/(mE*100);
+        number_ = (eN*10000)/(mE*100);
     }
 }
