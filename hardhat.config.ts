@@ -2,6 +2,8 @@ import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
 
 const config: HardhatUserConfig = {
+  solidity: "0.8.17",
+
   networks: {
     hardhat: {
       forking: {
@@ -25,7 +27,6 @@ const config: HardhatUserConfig = {
   },
 
 };
-
 
 
 export default config;
