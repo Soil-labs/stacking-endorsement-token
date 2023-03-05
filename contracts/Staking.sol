@@ -29,8 +29,9 @@ interface IEquations {
     function getMaxRewards(uint256 m, MaxRewards[] memory MR, uint256 _availRewards) external view returns (uint256);
 }
 
-// TODO:  - available rewards // when a job is finished we enter the available rewards
-//        - withdraw stake
+interface IEscrow {
+    function transferFunds(address _staker, uint256 _amount) external;
+}
 
 contract Staking is Ownable {
     using SafeERC20 for IERC20;
@@ -39,8 +40,12 @@ contract Staking is Ownable {
     address public equations;
     uint256 public MAX_ENDORCEMENTS = 10;
     uint256 public totalPools;
+    uint256 public immutable penalty = 5000; // in basis points so 5000 = 50%
 
     struct UserPool {
+        bool jobStatus;
+        uint256 availableRewards;
+
         uint256 totalStaked; // CD
         uint256 weightage0;
         uint256 weightage1;
@@ -50,12 +55,14 @@ contract Staking is Ownable {
         mapping(uint256 => address) usersStaked;
 
         address user;
+        address escrow;
     }
 
     struct Pool {
         bool endorced;
         address poolUser;
         uint256 amountStaked; // CR
+        bool claimed;
     }
 
     struct Staker {
@@ -81,7 +88,8 @@ contract Staking is Ownable {
         uint256 _weightage0,
         uint256 _weightage1,
         uint256 _multiplier,
-        address _user
+        address _user,
+        address _escrow
     ) external onlyOwner {
         uint256 currentPoolId = totalPools;
 
@@ -89,6 +97,8 @@ contract Staking is Ownable {
         userPool[currentPoolId].weightage1 = _weightage1;
         userPool[currentPoolId].multiplier = _multiplier;
         userPool[currentPoolId].user = _user;
+        userPool[currentPoolId].escrow = _escrow;
+        userPool[currentPoolId].availableRewards = 1 ether; // currently hardcoded
 
         totalPools++;
     }
@@ -123,21 +133,46 @@ contract Staking is Ownable {
         _staking().safeTransferFrom(msg.sender, address(this), _amount);
     }
 
-    // TODO: unstake, penalized for unstaking
+    function updateJobStatus(uint256 _poolId, bool _status) external onlyOwner {
+        UserPool storage userPoolData = userPool[_poolId];
 
-    // TODO: update job status of the user // onlyOwner/admin // simulate total rewards transfer
+        userPoolData.jobStatus = _status;
+    }
+
+    function unstakeFromPool(uint256 _poolId, uint256 _amount) external {
+        Staker storage userData = staker[msg.sender];
+
+        uint256 stakedAmount = userData.pool[_poolId].amountStaked;
+
+        userData.pool[_poolId].amountStaked -= _amount;
+        
+        require(_amount <= stakedAmount, "!stakedAmount");
+
+        uint256 penalizedAmount = (_amount * penalty) / 10_000; // calculated with basis points
+
+        _staking().safeTransfer(msg.sender, _amount - penalizedAmount);
+    }
 
     // TODO: staker total reward to be claimed
-
     function claimRewardsFromPool(
-        uint256 _pool, 
-        address _staker
+        uint256 _poolId
     ) external {
-        require(msg.sender == _staker, "!staker");
+        UserPool storage userPoolData = userPool[_poolId];
 
-        uint256 rewards = getRewardPerUser(_pool, 1 ether, _staker);
+        bool jobStatus = userPoolData.jobStatus;
 
-        _staking().safeTransfer(_staker, rewards);
+        uint256 availableRewards = userPoolData.availableRewards;
+
+        require(jobStatus == true, "!Completed");
+
+        uint256 rewards = getRewardPerUser(_poolId, availableRewards, msg.sender);
+
+        address escrow = userPoolData.escrow;
+
+        require(escrow != address(0), "!Escrow");
+        require(rewards >= 0, "!Reward");
+
+        IEscrow(escrow).transferFunds(msg.sender, rewards);
     }
 
     function getPoolData(
@@ -173,11 +208,14 @@ contract Staking is Ownable {
         address _staker
     ) external view returns (
         uint256 numberOfEndorcements_,
-        Pool[] memory pools
+        Pool[] memory pools,
+        uint256[] memory poolIds
     ){
         Staker storage stakerData = staker[_staker];
 
         numberOfEndorcements_ = stakerData.numberOfEndorcements;
+
+        poolIds = stakerData.poolsStaked;
 
         Pool[] memory myPools = new Pool[](stakerData.poolsStaked.length);
 
